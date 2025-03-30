@@ -1,7 +1,8 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Hr = require("../model/hr.js"); 
-const Job = require('../model/job.js')
+const Job = require('../model/job.js');
+const Application = require("../model/application.js");
 require("dotenv").config();
 //register hr
 const registerHr = async (req,res)=>{
@@ -142,7 +143,6 @@ const updateHrJob = async (req, res) => {
       res.status(500).json({ success: false, message: "Internal Server Error" });
     }
   };
-  
 //delete a job
 const deleteHrJob = async(req,res) =>{
     try {
@@ -155,10 +155,72 @@ const deleteHrJob = async(req,res) =>{
         if(!job){
             return res.status(404).json({success:false,message:"Job not Found"})
         }
+        await Application.deleteMany({ job: id });
         const updatedJob = await Job.findByIdAndDelete(id, req.body, { new: true });
         res.status(200).json({ success: true, message: "Job deleted successfully", job: updatedJob });
     } catch (error) {
         res.status(500).json({success:false,message:"Internal server error"})
     }
 }
-module.exports = {registerHr,loginHr,hrProfile,createJob,getHrJob,getJobById,updateHrJob,deleteHrJob}
+//Applications
+//get applications based on the job id
+const getApplicationForJob = async(req,res)=>{
+    try {
+      const { jobId } = req.params;
+      const hrId = req.user.id; 
+  
+      const applications = await Application.find({ job: jobId, hr: hrId })
+        .populate("user", "name email")
+        .populate("job", "title");
+  
+      res.status(200).json(applications);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+}
+//application status changer
+const updateApplicationStatus = async(req,res)=>{
+  try {
+    const { applicationId } = req.params;
+    const { status } = req.body;
+    const hrId = req.user.id;
+
+    const application = await Application.findOne({
+      _id: applicationId,
+      hr: hrId, 
+    });
+    if (!application) {
+      return res.status(404).json({ message: "Application not found or unauthorized" });
+    }
+
+    application.status = status;
+    await application.save();
+
+    res.status(200).json({ message: "Application status updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+const getApplicationsForHR = async (req, res) => {
+  try {
+    
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized: HR ID not found" });
+    }
+
+    const hrId = req.user.id;
+    const applications = await Application.find({ hr: hrId })
+      .populate("user", "name email")
+      .populate("job", "title");
+    if (!applications.length) {
+      return res.status(200).json({ message: "No applications found", data: [] });
+    }
+
+    res.status(200).json({ success: true, data: applications });
+  } catch (error) {
+    console.error("Error fetching applications:", error);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
+};
+
+module.exports = {registerHr,loginHr,hrProfile,createJob,getHrJob,getJobById,updateHrJob,deleteHrJob, getApplicationForJob,updateApplicationStatus , getApplicationsForHR}

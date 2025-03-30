@@ -1,5 +1,5 @@
 const express = require("express");
-const { registerUser, loginUser, getJobsUser,getSavedJobs,getJobById,saveJob,userProfile, analyseResume, downloadResume,previewResume, createResume, allResume, getResume, updateResume, deleteResume, removeJob } = require("../controller/userController");
+const { registerUser, loginUser, getJobsUser,getSavedJobs,getJobById,saveJob,userProfile, analyseResume, downloadResume,previewResume, createResume, allResume, getResume, updateResume, deleteResume, removeJob, applyJob,jobsApplied, withdrawApplication, applicationStatus, applicationFromJob} = require("../controller/userController");
 const authUser = require("../middleware/userAuth.js");
 const upload = require("../config/multer.js");
 const userRouter = express.Router();
@@ -14,7 +14,12 @@ userRouter.get("/get-job-id/:jobId", authUser, getJobById);
 userRouter.post("/save-job", authUser, saveJob);
 userRouter.post("/remove-saved-job", authUser, removeJob);
 userRouter.get("/saved-jobs", authUser, getSavedJobs);
-
+//Application routes
+userRouter.post("/apply",authUser,applyJob);
+userRouter.get("/my-applications",authUser,jobsApplied);
+userRouter.get("/status/:applicationId",authUser,applicationStatus);
+userRouter.delete("/withdraw/:applicationId",authUser,withdrawApplication);
+userRouter.get("/application-id/:jobId",authUser,applicationFromJob)
 //resume analysis
 userRouter.post("/analyze-resume",authUser,upload.single("file"),analyseResume);
 //resume builder

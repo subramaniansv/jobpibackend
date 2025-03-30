@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../model/user.js");
 const Job = require("../model/job.js");
+const Application = require("../model/application.js");
 const pdfParse = require("pdf-parse");
 const Resume = require("../model/resume.js");
 const { processResume } = require("../utils/processResume.js");
@@ -52,7 +53,6 @@ const registerUser = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
 // Login User
 const loginUser = async (req, res) => {
   try {
@@ -168,7 +168,6 @@ const getJobsUser = async (req, res) => {
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
-
 // Get Job by ID
 const getJobById = async (req, res) => {
   try {
@@ -239,8 +238,100 @@ const getSavedJobs = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
-//***RESUME ANALYSIS****//
+//Applicatons controller
+//apply for a job
+const applyJob = async (req, res) => {
+  try {
+    const { jobId } = req.body;
+    const userId = req.user.id;
 
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+
+    // Check if user has already applied
+    const existingApplication = await Application.findOne({ user: userId, job: jobId });
+    if (existingApplication) {
+      return res.status(400).json({ message: "You have already applied for this job" });
+    }
+
+    const newApplication = new Application({
+      user: userId,
+      job: jobId,
+      hr: job.hrId,
+    });
+
+    await newApplication.save();
+    res.status(201).json({ message: "Application submitted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+//withdraw application 
+const withdrawApplication = async (req,res)=>{
+  try {
+    const { applicationId } = req.params;
+    const userId = req.user.id;
+
+    const application = await Application.findOneAndDelete({
+      _id: applicationId,
+      user: userId,
+    });
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    res.status(200).json({ message: "Application withdrawn successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+//application id
+const applicationFromJob = async (req,res)=>{
+  try {
+    const userId = req.user.id;
+    const { jobId } = req.params;
+
+    const application = await Application.findOne({ user: userId, job: jobId });
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    res.status(200).json({ applicationId: application._id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+//all jobs applied by the user
+const jobsApplied = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const applications = await Application.find({ user: userId })
+      .populate("job", "title company location")
+      .populate("hr", "name email");
+
+    res.status(200).json({ AppliedJobs: applications }); 
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const applicationStatus = async(req,res)=>{
+  try {
+    const { applicationId } = req.params;
+    const application = await Application.findById(applicationId);
+
+    if (!application) {
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    res.status(200).json({ status: application.status });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+//***RESUME ANALYSIS****//
 const analyseResume = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: "Upload a file" });
@@ -447,5 +538,10 @@ module.exports = {
   allResume,
   getResume,
   updateResume,
-  deleteResume
+  deleteResume,
+  applyJob,
+  jobsApplied,
+  applicationFromJob,
+  withdrawApplication,
+  applicationStatus,
 };
